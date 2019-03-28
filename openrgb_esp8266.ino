@@ -1,15 +1,25 @@
+#include <FS.h>
+#include <ArduinoJson.h>
+#include <WiFiManager.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUDP.h>
 
-const char* ssid = "IOT";
-const char* password = "123456789120";
 
 WiFiUDP wifiServer;
 unsigned int port = 8898;
 
 int cr = 0, cg = 0, cb = 0;
 
-const String deviceID = "TEST";
+String deviceID = "DEFAULT";
+
+char customID[40];
+
+bool shouldSaveConfig = false;
+
+void saveConfigCallback () {
+  Serial.println("Should save config");
+  shouldSaveConfig = true;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -20,7 +30,46 @@ void setup() {
   analogWrite(D6, 1024);
   analogWrite(D7, 1024);
 
-  WiFi.begin(ssid, password);
+  Serial.println("mounting FS...");
+  
+    if (SPIFFS.begin()) {
+      Serial.println("mounted file system");
+      if (SPIFFS.exists("/config.json")) {
+        //file exists, reading and loading
+        Serial.println("reading config file");
+        File configFile = SPIFFS.open("/config.json", "r");
+        if (configFile) {
+          Serial.println("opened config file");
+          size_t size = configFile.size();
+          // Allocate a buffer to store contents of the file.
+          std::unique_ptr<char[]> buf(new char[size]);
+  
+          configFile.readBytes(buf.get(), size);
+          DynamicJsonBuffer jsonBuffer;
+          JsonObject& json = jsonBuffer.parseObject(buf.get());
+          json.printTo(Serial);
+          if (json.success()) {
+            Serial.println("\nparsed json");
+            strcpy(customID, json["customID"]);
+          } else {
+            Serial.println("failed to load json config");
+          }
+        }
+      }
+    } else {
+      Serial.println("failed to mount FS");
+    }
+    //end read
+    
+WiFiManager wifiManager;
+//wifiManager.resetSettings();
+    
+WiFiManagerParameter custom_output("customID", "customID", customID, 40);
+wifiManager.setSaveConfigCallback(saveConfigCallback);    
+wifiManager.addParameter(&custom_output);
+wifiManager.autoConnect("autoconnect");
+
+
 
   while(WiFi.status() != WL_CONNECTED){
     delay(1000);
@@ -36,6 +85,43 @@ void setup() {
 
   flash();
   flash();
+
+  strcpy(customID, custom_output.getValue());
+  if(strlen(customID) > 0) deviceID = customID;
+  Serial.println("Device ID is: "+deviceID);
+
+
+
+if (SPIFFS.begin()) {
+      Serial.println("mounted file system");
+      if (SPIFFS.exists("/config.json")) {
+        //file exists, reading and loading
+        Serial.println("reading config file");
+        File configFile = SPIFFS.open("/config.json", "r");
+        if (configFile) {
+          Serial.println("opened config file");
+          size_t size = configFile.size();
+          // Allocate a buffer to store contents of the file.
+          std::unique_ptr<char[]> buf(new char[size]);
+  
+          configFile.readBytes(buf.get(), size);
+          DynamicJsonBuffer jsonBuffer;
+          JsonObject& json = jsonBuffer.parseObject(buf.get());
+          json.printTo(Serial);
+          if (json.success()) {
+            Serial.println("\nparsed json");
+            json["customID"]= customID;
+          } else {
+            Serial.println("failed to load json config");
+          }
+        }
+      }
+    } else {
+      Serial.println("failed to mount FS");
+    }
+    //end read
+
+  
   
   wifiServer.begin(port);
 }
