@@ -59,7 +59,6 @@ void setup() {
     } else {
       Serial.println("failed to mount FS");
     }
-    //end read
     
 WiFiManager wifiManager;
 //wifiManager.resetSettings();
@@ -86,40 +85,16 @@ wifiManager.autoConnect("autoconnect");
   flash();
   flash();
 
-  strcpy(customID, custom_output.getValue());
+  if(strlen(custom_output.getValue()) > 0)strcpy(customID, custom_output.getValue());
   if(strlen(customID) > 0) deviceID = customID;
   Serial.println("Device ID is: "+deviceID);
 
 
-
-if (SPIFFS.begin()) {
-      Serial.println("mounted file system");
-      if (SPIFFS.exists("/config.json")) {
-        //file exists, reading and loading
-        Serial.println("reading config file");
-        File configFile = SPIFFS.open("/config.json", "r");
-        if (configFile) {
-          Serial.println("opened config file");
-          size_t size = configFile.size();
-          // Allocate a buffer to store contents of the file.
-          std::unique_ptr<char[]> buf(new char[size]);
-  
-          configFile.readBytes(buf.get(), size);
-          DynamicJsonBuffer jsonBuffer;
-          JsonObject& json = jsonBuffer.parseObject(buf.get());
-          json.printTo(Serial);
-          if (json.success()) {
-            Serial.println("\nparsed json");
-            json["customID"]= customID;
-          } else {
-            Serial.println("failed to load json config");
-          }
-        }
-      }
-    } else {
-      Serial.println("failed to mount FS");
-    }
-    //end read
+  StaticJsonBuffer<200> jsonBuffer;
+  JsonObject& json = jsonBuffer.createObject();
+  json["customID"] = customID;
+  File configFile = SPIFFS.open("/config.json", "w");
+  if(configFile) json.printTo(configFile);
 
   
   
